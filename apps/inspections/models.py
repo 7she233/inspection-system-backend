@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -6,15 +7,32 @@ User = get_user_model()
 class Inspection(models.Model):
     """巡检记录"""
     STATUS_CHOICES = (
-        ('recording', '记录中'),
+        ('draft', '草稿'),
+        ('in_progress', '进行中'),
         ('completed', '已完成'),
+        ('archived', '已归档')
     )
 
     id = models.CharField(primary_key=True, max_length=32, help_text="巡检ID")
-    name = models.CharField(max_length=100, help_text="巡检名称")
-    location = models.TextField(help_text="巡检位置")
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='recording', help_text="状态")
-    user = models.ForeignKey(User, on_delete=models.CASCADE, help_text="创建用户")
+    title = models.CharField(max_length=100, help_text="巡检标题")
+    location = models.CharField(max_length=255, help_text="巡检地点")
+    latitude = models.FloatField(null=True, blank=True, help_text="纬度")
+    longitude = models.FloatField(null=True, blank=True, help_text="经度")
+    inspector = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name='inspections',
+        help_text="巡检人员"
+    )
+    status = models.CharField(
+        max_length=20, 
+        choices=STATUS_CHOICES,
+        default='draft',
+        help_text="巡检状态"
+    )
+    start_time = models.DateTimeField(null=True, blank=True, help_text="开始时间")
+    end_time = models.DateTimeField(null=True, blank=True, help_text="结束时间")
+    summary = models.TextField(blank=True, help_text="巡检总结")
     created_at = models.DateTimeField(auto_now_add=True, help_text="创建时间")
     updated_at = models.DateTimeField(auto_now=True, help_text="更新时间")
 
@@ -25,11 +43,34 @@ class Inspection(models.Model):
         verbose_name_plural = verbose_name
 
     def __str__(self):
-        return f"{self.name} ({self.get_status_display()})"
+        return f"{self.title} ({self.get_status_display()})"
+
+    def start(self):
+        """开始巡检"""
+        if self.status != 'draft':
+            raise ValueError('只有草稿状态可以开始巡检')
+        self.status = 'in_progress'
+        self.start_time = timezone.now()
+        self.save()
+
+    def complete(self):
+        """完成巡检"""
+        if self.status != 'in_progress':
+            raise ValueError('只有进行中的巡检可以完成')
+        self.status = 'completed'
+        self.end_time = timezone.now()
+        self.save()
+
+    def archive(self):
+        """归档巡检"""
+        if self.status != 'completed':
+            raise ValueError('只有已完成的巡检可以归档')
+        self.status = 'archived'
+        self.save()
 
 
 class Event(models.Model):
-    """事件��"""
+    """事件"""
     id = models.CharField(primary_key=True, max_length=32, help_text="事件ID")
     inspection = models.ForeignKey(Inspection, on_delete=models.CASCADE, related_name='events', help_text="所属巡检")
     description = models.TextField(blank=True, help_text="问题描述")

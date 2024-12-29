@@ -3,6 +3,14 @@ version: '3.8'
 services:
   web:
     build: .
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
     ports:
       - "8000:80"
     volumes:
@@ -36,6 +44,13 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          memory: 256M
 
 networks:
   inspection_network:
